@@ -1,0 +1,666 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
+<meta name="theme-color" content="#ffffff">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<title>Щоденник</title>
+<style>
+:root{
+  --bg:#ffffff; --card:#ffffff; --text:#232323; --muted:#8a8a86; --faint:#c4c4c0;
+  --border:#ececea; --hover:#f5f5f3; --accent:#3f6c9e; --accent-soft:#eaf0f7;
+  --danger:#c0473f;
+  --serif: ui-serif, "Iowan Old Style", Georgia, "Times New Roman", serif;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);overscroll-behavior:none}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+input{font:inherit;color:inherit}
+svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;display:block;flex-shrink:0}
+.view{position:fixed;inset:0;height:100dvh;display:flex;flex-direction:column;background:var(--bg)}
+.view[hidden]{display:none}
+.top{display:flex;align-items:center;justify-content:space-between;gap:4px;padding:calc(env(safe-area-inset-top) + 12px) 12px 8px 20px;min-height:60px}
+.top h1{font-family:var(--serif);font-weight:500;font-size:28px;margin:0;letter-spacing:-.01em;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.top.back{padding-left:8px}
+.top.back h1{font-size:22px}
+.actions{display:flex;gap:2px}
+.icon-btn{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;color:var(--muted);flex-shrink:0}
+.icon-btn:active{background:var(--hover)}
+.icon-btn.on{color:var(--accent)}
+.icon-btn.on svg{fill:currentColor}
+.list{flex:1;overflow-y:auto;padding:0 16px calc(env(safe-area-inset-bottom) + 100px)}
+
+/* home */
+.label{font-size:13px;font-weight:600;color:var(--muted);margin:22px 4px 8px;letter-spacing:.02em}
+.group{background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden}
+.row{display:flex;align-items:center;gap:14px;width:100%;padding:12px 14px;text-align:left}
+.row+.row{border-top:1px solid var(--border)}
+.row:active{background:var(--hover)}
+.tile{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-size:19px;flex-shrink:0;color:var(--muted);background:var(--hover)}
+.tile svg{width:19px;height:19px}
+.row .name{flex:1;min-width:0;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .cnt{color:var(--muted);font-size:15px}
+.row .chev{width:16px;height:16px;color:var(--faint)}
+.row.add{color:var(--accent)}
+.row.add .tile{background:var(--accent-soft);color:var(--accent)}
+.hint{text-align:center;color:var(--muted);line-height:1.5;margin:28px 20px 0;font-size:14px}
+
+/* journal page */
+#searchBar{padding:0 16px 8px}
+#searchBar input{width:100%;height:42px;border:1px solid var(--border);background:var(--card);border-radius:12px;padding:0 14px;outline:none}
+#searchBar input:focus{border-color:var(--accent)}
+.sec{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--muted);margin:20px 4px 8px;letter-spacing:.02em}
+.sec svg{width:14px;height:14px}
+.card{display:flex;gap:14px;width:100%;text-align:left;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:10px;align-items:flex-start;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.card:active{background:var(--hover)}
+.card .d{min-width:38px;text-align:center}
+.card .d b{display:block;font-family:var(--serif);font-weight:500;font-size:26px;line-height:1}
+.card .d span{display:block;font-size:12px;color:var(--muted);margin-top:4px;text-transform:uppercase}
+.card .t{flex:1;min-width:0}
+.card .t h3{margin:0 0 4px;font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .t p{margin:0;font-size:14px;line-height:1.45;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
+.card .t .meta{font-size:12px;color:var(--muted);margin-top:6px}
+.card img{width:64px;height:64px;border-radius:10px;object-fit:cover;flex-shrink:0}
+.card .pin{width:14px;height:14px;color:var(--accent);fill:currentColor;margin-left:6px;display:inline-block;vertical-align:-1px}
+.empty-state{text-align:center;color:var(--muted);margin-top:16vh;padding:0 30px;line-height:1.5}
+.empty-state h2{font-family:var(--serif);font-weight:500;color:var(--text);font-size:22px;margin:0 0 8px}
+#fab{position:fixed;right:20px;bottom:calc(env(safe-area-inset-bottom) + 22px);width:58px;height:58px;border-radius:18px;background:var(--accent);color:#fff;display:grid;place-items:center;box-shadow:0 6px 20px rgba(63,108,158,.28)}
+#fab svg{width:26px;height:26px;stroke-width:2.2}
+#fab:active{transform:scale(.96)}
+
+/* editor */
+#dateBtn{flex:1;min-width:0;height:42px;border-radius:12px;color:var(--muted);font-size:15px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#dateBtn:active{background:var(--hover)}
+#date{position:absolute;opacity:0;pointer-events:none;width:1px;height:1px}
+.scroll{flex:1;overflow-y:auto;padding:4px 22px 40px;-webkit-overflow-scrolling:touch}
+#jChip{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px 0 8px;border-radius:10px;background:var(--hover);color:var(--muted);font-size:14px;margin-bottom:4px}
+#jChip svg{width:14px;height:14px}
+#title{width:100%;border:0;outline:0;background:transparent;font-family:var(--serif);font-size:30px;font-weight:500;padding:8px 0;letter-spacing:-.01em}
+#title::placeholder,#body.empty::before{color:var(--faint)}
+#body{outline:none;min-height:50vh;font-size:17px;line-height:1.65;word-break:break-word;padding-bottom:30vh;position:relative}
+#body.empty::before{content:attr(data-ph);position:absolute;pointer-events:none}
+#body p,#body div{margin:0 0 .6em}
+#body ul,#body ol{margin:.2em 0 .8em;padding-left:1.4em}
+#body li{margin:.15em 0}
+#body img{max-width:100%;border-radius:12px;display:block;margin:.4em 0}
+.toolbar{display:flex;gap:4px;align-items:center;padding:6px 12px calc(env(safe-area-inset-bottom) + 6px);background:var(--card);border-top:1px solid var(--border);flex-shrink:0}
+.toolbar button{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;color:var(--text)}
+.toolbar button.on{background:var(--accent-soft);color:var(--accent)}
+.toolbar button:active{background:var(--hover)}
+.toolbar .sep{width:1px;height:22px;background:var(--border);margin:0 6px}
+.toolbar .txt{font-family:var(--serif);font-size:20px;font-weight:700}
+.toolbar .txt.i{font-style:italic;font-weight:500}
+
+/* sheet */
+#sheet{position:fixed;inset:0;background:rgba(30,30,30,.32);display:flex;align-items:flex-end;z-index:10}
+#sheet[hidden]{display:none}
+#sheetPanel{width:100%;max-height:88dvh;overflow-y:auto;background:var(--card);border-radius:22px 22px 0 0;padding:10px 12px calc(env(safe-area-inset-bottom) + 14px)}
+.grab{width:38px;height:4px;border-radius:2px;background:var(--border);margin:4px auto 10px}
+.sbtn{display:flex;gap:14px;align-items:center;width:100%;padding:14px 10px;border-radius:12px;font-size:16px;text-align:left}
+.sbtn:active{background:var(--hover)}
+.sbtn.danger{color:var(--danger)}
+.sbtn.sel{background:var(--accent-soft)}
+.sbtn .tile{width:32px;height:32px;font-size:17px}
+.stitle{font-family:var(--serif);font-size:20px;padding:4px 10px 10px}
+.note{font-size:13px;color:var(--muted);padding:6px 10px 10px;line-height:1.45}
+.field{width:100%;height:46px;border:1px solid var(--border);border-radius:12px;padding:0 14px;outline:none;font-size:16px;margin:0 0 12px}
+.field:focus{border-color:var(--accent)}
+.flabel{font-size:13px;color:var(--muted);margin:6px 4px 8px}
+.pick{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.pick button{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-size:22px;border:1.5px solid transparent;background:var(--hover)}
+.pick.colors button{border-radius:50%;width:36px;height:36px}
+.pick button.sel{border-color:var(--accent);background:var(--accent-soft)}
+.pick.colors button.sel{border-color:var(--text)}
+.primary{width:100%;height:48px;border-radius:14px;background:var(--accent);color:#fff;font-weight:600;font-size:16px;margin-top:4px}
+.primary:disabled{opacity:.4}
+.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 96px);transform:translateX(-50%);background:var(--text);color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:20;opacity:0;transition:opacity .2s;pointer-events:none;max-width:86vw;text-align:center}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<!-- Головна: список журналів -->
+<div id="home" class="view">
+  <header class="top">
+    <h1>Журнали</h1>
+    <div class="actions">
+      <button class="icon-btn" id="addJ" aria-label="Новий журнал"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+      <button class="icon-btn" id="menuBtn" aria-label="Меню"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+    </div>
+  </header>
+  <main class="list" id="homeList"></main>
+</div>
+
+<!-- Сторінка журналу -->
+<div id="journal" class="view" hidden>
+  <header class="top back">
+    <button class="icon-btn" id="jBack" aria-label="Назад"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <h1 id="jTitle"></h1>
+    <div class="actions">
+      <button class="icon-btn" id="searchBtn" aria-label="Пошук"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></button>
+      <button class="icon-btn" id="jMenu" aria-label="Налаштування журналу"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg></button>
+    </div>
+  </header>
+  <div id="searchBar" hidden><input id="q" type="search" placeholder="Пошук у записах"></div>
+  <main class="list" id="entries"></main>
+  <button id="fab" aria-label="Новий запис"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+</div>
+
+<!-- Редактор -->
+<div id="editor" class="view" hidden>
+  <header class="top back">
+    <button class="icon-btn" id="back" aria-label="Назад"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <button id="dateBtn" aria-label="Змінити дату"></button>
+    <input id="date" type="date" tabindex="-1">
+    <button class="icon-btn" id="pinBtn" aria-label="Закріпити"><svg viewBox="0 0 24 24"><path d="M9 4h6l-1 6 3 3v2H7v-2l3-3-1-6zM12 15v5"/></svg></button>
+    <button class="icon-btn" id="del" aria-label="Видалити запис"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 002 2h6a2 2 0 002-2l1-12M9 7V4h6v3"/></svg></button>
+  </header>
+  <div class="scroll" id="scroll">
+    <button id="jChip"></button>
+    <input id="title" placeholder="Заголовок" autocomplete="off" enterkeyhint="next">
+    <div id="body" class="empty" contenteditable="true" data-ph="Що сьогодні на думці?" spellcheck="true"></div>
+  </div>
+  <div class="toolbar" id="toolbar">
+    <button type="button" data-cmd="bold" aria-label="Жирний"><span class="txt">B</span></button>
+    <button type="button" data-cmd="italic" aria-label="Курсив"><span class="txt i">I</span></button>
+    <span class="sep"></span>
+    <button type="button" data-cmd="insertUnorderedList" aria-label="Маркований список"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r=".8"/><circle cx="4.5" cy="12" r=".8"/><circle cx="4.5" cy="18" r=".8"/></svg></button>
+    <button type="button" data-cmd="insertOrderedList" aria-label="Нумерований список"><svg viewBox="0 0 24 24"><path d="M10 6h10M10 12h10M10 18h10M4 5l1.5-1v4M4 14.5c0-1 2.5-1 2.5 0S4 16 4 17.5h2.7"/></svg></button>
+    <span class="sep"></span>
+    <button type="button" id="imgBtn" aria-label="Додати зображення"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8"/></svg></button>
+  </div>
+  <input id="file" type="file" accept="image/*" multiple hidden>
+</div>
+
+<div id="sheet" hidden><div id="sheetPanel"></div></div>
+<input id="importFile" type="file" accept="application/json,.json" hidden>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const h = (tag, props = {}, ...kids) => {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) {
+    if (k === 'class') el.className = v;
+    else if (k === 'html') el.innerHTML = v;
+    else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+    else el.setAttribute(k, v);
+  }
+  for (const c of kids.flat()) { if (c == null || c === false) continue; el.append(c.nodeType ? c : document.createTextNode(c)); }
+  return el;
+};
+const ICON = {
+  chev: '<svg class="chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>',
+  all: '<svg viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/></svg>',
+  plus: '<svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
+  pin: '<svg viewBox="0 0 24 24"><path d="M9 4h6l-1 6 3 3v2H7v-2l3-3-1-6zM12 15v5"/></svg>',
+  trash: '<svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 002 2h6a2 2 0 002-2l1-12M9 7V4h6v3"/></svg>',
+  image: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8"/></svg>',
+  clip: '<svg viewBox="0 0 24 24"><rect x="6" y="5" width="12" height="16" rx="2"/><path d="M9 5V4a1 1 0 011-1h4a1 1 0 011 1v1"/></svg>',
+  swap: '<svg viewBox="0 0 24 24"><path d="M4 8h14l-3-3M20 16H6l3 3"/></svg>',
+  down: '<svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
+  up: '<svg viewBox="0 0 24 24"><path d="M12 15V4M7 9l5-5 5 5M5 20h14"/></svg>',
+};
+const ico = s => h('span', { html: s, style: 'display:contents' });
+
+/* ---------- Дати (українською, дд місяць рррр) ---------- */
+const MONTHS = ['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
+const MONTHS_GEN = ['січня','лютого','березня','квітня','травня','червня','липня','серпня','вересня','жовтня','листопада','грудня'];
+const WD_SHORT = ['нд','пн','вт','ср','чт','пт','сб'];
+const WD_FULL = ['неділя','понеділок','вівторок','середа','четвер',"п'ятниця",'субота'];
+const parseISO = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const fmtFull = iso => { const d = parseISO(iso); return `${WD_FULL[d.getDay()]}, ${d.getDate()} ${MONTHS_GEN[d.getMonth()]} ${d.getFullYear()}`; };
+const todayISO = () => { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10); };
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2400); }
+
+/* ---------- Сховище (IndexedDB) ---------- */
+const DB = (() => {
+  let db;
+  const req = r => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+  const st = (n, m) => db.transaction(n, m).objectStore(n);
+  return {
+    open: () => new Promise((res, rej) => {
+      const r = indexedDB.open('journal', 2);
+      r.onupgradeneeded = () => {
+        const d = r.result;
+        if (!d.objectStoreNames.contains('entries')) d.createObjectStore('entries', { keyPath: 'id' });
+        if (!d.objectStoreNames.contains('journals')) d.createObjectStore('journals', { keyPath: 'id' });
+      };
+      r.onsuccess = () => { db = r.result; res(); };
+      r.onerror = () => rej(r.error);
+    }),
+    all: n => req(st(n, 'readonly').getAll()),
+    put: (n, o) => req(st(n, 'readwrite').put(o)),
+    del: (n, id) => req(st(n, 'readwrite').delete(id)),
+  };
+})();
+
+let journals = [], entries = [];
+let view = 'home', curJ = null, lastJ = null, cur = null;
+let saveTimer = null, savedRange = null, thumbKey = null;
+const body = $('#body'), titleIn = $('#title'), dateIn = $('#date');
+const jById = id => journals.find(j => j.id === id);
+const COLORS = ['#6b8cae', '#7fa38a', '#c08a6a', '#b3829f', '#c9a45c', '#7a7fb5', '#5f9ea0', '#8d8d88'];
+const EMOJIS = ['📓', '📖', '🎬', '💼', '✈️', '💪', '❤️', '🎧', '🍳', '🌱', '💡', '⭐'];
+const tint = c => c + '26';
+
+function jTile(j) {
+  const t = h('span', { class: 'tile' }, j.icon);
+  t.style.background = tint(j.color);
+  return t;
+}
+
+/* ---------- Навігація ---------- */
+function show(v) {
+  view = v;
+  for (const id of ['home', 'journal', 'editor']) $('#' + id).hidden = id !== v;
+}
+function showHome() { show('home'); renderHome(); }
+function openJournal(id) {
+  curJ = id;
+  if (id !== 'all') lastJ = id;
+  $('#q').value = ''; $('#searchBar').hidden = true;
+  history.pushState({ v: 'journal' }, '');
+  show('journal');
+  renderJournal();
+}
+window.addEventListener('popstate', () => {
+  if (sheetOpen) { hideSheet(); history.pushState({ v: view }, ''); return; } // «Назад» закриває лише аркуш
+  if (view === 'editor') closeEditor();
+  else if (view === 'journal') showHome();
+});
+
+/* ---------- Аркуш (нижня панель) ---------- */
+const sheetEl = $('#sheet'); let sheetOpen = false;
+function openSheet(...nodes) {
+  const p = $('#sheetPanel');
+  p.textContent = '';
+  p.append(h('div', { class: 'grab' }), ...nodes);
+  sheetEl.hidden = false; sheetOpen = true;
+}
+function hideSheet() { sheetEl.hidden = true; sheetOpen = false; }
+sheetEl.addEventListener('click', e => { if (e.target === sheetEl) hideSheet(); });
+const sbtn = (icon, label, fn, cls = '') => h('button', { class: 'sbtn ' + cls, onclick: fn }, ico(icon), label);
+
+/* ---------- Головна ---------- */
+function renderHome() {
+  const root = $('#homeList');
+  root.textContent = '';
+  const countOf = id => entries.filter(e => e.journalId === id).length;
+  const allRow = h('button', { class: 'row', onclick: () => openJournal('all') },
+    h('span', { class: 'tile', html: ICON.all }), h('span', { class: 'name' }, 'Усі записи'),
+    h('span', { class: 'cnt' }, entries.length), ico(ICON.chev));
+  root.append(h('div', { class: 'group', style: 'margin-top:6px' }, allRow));
+  root.append(h('div', { class: 'label' }, 'Мої журнали'));
+  const g = h('div', { class: 'group' });
+  for (const j of journals) {
+    g.append(h('button', { class: 'row', onclick: () => openJournal(j.id) },
+      jTile(j), h('span', { class: 'name' }, j.name), h('span', { class: 'cnt' }, countOf(j.id)), ico(ICON.chev)));
+  }
+  g.append(h('button', { class: 'row add', onclick: () => journalForm() },
+    h('span', { class: 'tile', html: ICON.plus }), h('span', { class: 'name' }, 'Новий журнал')));
+  root.append(g);
+  root.append(h('div', { class: 'hint' }, 'Створюйте окремі журнали: для читання, роботи, фільмів, подорожей — щоб усе не лежало в одному місці.'));
+}
+
+function journalForm(j) {
+  const isNew = !j;
+  let icon = j ? j.icon : EMOJIS[0], color = j ? j.color : COLORS[0];
+  const name = h('input', { class: 'field', placeholder: 'Назва журналу', maxlength: '40', autocomplete: 'off' });
+  name.value = j ? j.name : '';
+  const iconBox = h('div', { class: 'pick' });
+  const colorBox = h('div', { class: 'pick colors' });
+  const saveBtn = h('button', { class: 'primary' }, isNew ? 'Створити' : 'Зберегти');
+  const refresh = () => {
+    iconBox.textContent = ''; colorBox.textContent = '';
+    for (const e of EMOJIS) iconBox.append(h('button', { class: e === icon ? 'sel' : '', onclick: () => { icon = e; refresh(); } }, e));
+    for (const c of COLORS) { const b = h('button', { class: c === color ? 'sel' : '', onclick: () => { color = c; refresh(); } }); b.style.background = c; colorBox.append(b); }
+    saveBtn.disabled = !name.value.trim();
+  };
+  name.addEventListener('input', refresh);
+  saveBtn.onclick = async () => {
+    const nm = name.value.trim(); if (!nm) return;
+    const obj = j || { id: uid(), order: Date.now() };
+    Object.assign(obj, { name: nm, icon, color });
+    await DB.put('journals', obj);
+    if (isNew) journals.push(obj);
+    hideSheet();
+    if (view === 'journal') renderJournal(); else renderHome();
+  };
+  const nodes = [h('div', { class: 'stitle' }, isNew ? 'Новий журнал' : 'Журнал'), name,
+    h('div', { class: 'flabel' }, 'Значок'), iconBox, h('div', { class: 'flabel' }, 'Колір'), colorBox, saveBtn];
+  if (!isNew && journals.length > 1) {
+    nodes.push(h('button', { class: 'sbtn danger', style: 'margin-top:6px;justify-content:center', onclick: () => deleteJournal(j) }, 'Видалити журнал'));
+  }
+  refresh();
+  openSheet(...nodes);
+  if (isNew) setTimeout(() => name.focus(), 80);
+}
+async function deleteJournal(j) {
+  const mine = entries.filter(e => e.journalId === j.id);
+  if (!confirm(`Видалити журнал «${j.name}» разом із записами (${mine.length})? Цю дію не можна скасувати.`)) return;
+  for (const e of mine) await DB.del('entries', e.id);
+  await DB.del('journals', j.id);
+  entries = entries.filter(e => e.journalId !== j.id);
+  journals = journals.filter(x => x.id !== j.id);
+  if (lastJ === j.id) lastJ = null;
+  hideSheet();
+  history.back(); // зі сторінки журналу — на головну
+}
+
+/* ---------- Сторінка журналу ---------- */
+function cardFor(e) {
+  const dt = parseISO(e.date);
+  const c = h('button', { class: 'card' });
+  c.append(h('div', { class: 'd' }, h('b', {}, dt.getDate()), h('span', {}, WD_SHORT[dt.getDay()])));
+  const t = h('div', { class: 't' });
+  const title = e.title || e.text.slice(0, 50) || 'Без назви';
+  const h3 = h('h3', {}, title);
+  if (e.pinned) h3.append(h('span', { class: 'pin', html: ICON.pin.replace('<svg', '<svg class="pin"') }));
+  t.append(h3);
+  const prev = e.title ? e.text.slice(0, 160) : e.text.slice(50, 210);
+  if (prev) t.append(h('p', {}, prev));
+  if (curJ === 'all') { const j = jById(e.journalId); if (j) t.append(h('div', { class: 'meta' }, `${j.icon} ${j.name}`)); }
+  c.append(t);
+  if (e.thumb) c.append(h('img', { src: e.thumb, alt: '' }));
+  c.onclick = () => openEditor(e);
+  c.addEventListener('contextmenu', ev => { ev.preventDefault(); entryMenu(e); });
+  return c;
+}
+function entryMenu(e) {
+  openSheet(
+    sbtn(ICON.pin, e.pinned ? 'Відкріпити' : 'Закріпити', async () => { e.pinned = !e.pinned; await DB.put('entries', e); hideSheet(); renderJournal(); }),
+    sbtn(ICON.trash, 'Видалити запис', async () => {
+      if (!confirm('Видалити цей запис?')) return;
+      await DB.del('entries', e.id); entries = entries.filter(x => x !== e); hideSheet(); renderJournal();
+    }, 'danger'));
+}
+function renderJournal() {
+  const j = curJ === 'all' ? null : jById(curJ);
+  $('#jTitle').textContent = j ? `${j.icon} ${j.name}` : 'Усі записи';
+  $('#jMenu').hidden = !j;
+  const q = $('#q').value.trim().toLowerCase();
+  const items = entries
+    .filter(e => (curJ === 'all' || e.journalId === curJ) && (!q || (e.title + ' ' + e.text).toLowerCase().includes(q)))
+    .sort((a, b) => b.date.localeCompare(a.date) || b.updated - a.updated);
+  const root = $('#entries');
+  root.textContent = '';
+  if (!items.length) {
+    root.append(h('div', { class: 'empty-state', html: q ? '<h2>Нічого не знайдено</h2>' : '<h2>Тут поки порожньо</h2>Натисніть «+», щоб зробити перший запис.' }));
+    return;
+  }
+  const pinned = items.filter(e => e.pinned), rest = items.filter(e => !e.pinned);
+  if (pinned.length) {
+    root.append(h('div', { class: 'sec' }, ico(ICON.pin), 'Закріплені'));
+    pinned.forEach(e => root.append(cardFor(e)));
+  }
+  let group = '';
+  for (const e of rest) {
+    const key = e.date.slice(0, 7);
+    if (key !== group) {
+      group = key;
+      const d = parseISO(e.date);
+      root.append(h('div', { class: 'sec' }, `${MONTHS[d.getMonth()]} ${d.getFullYear()}`));
+    }
+    root.append(cardFor(e));
+  }
+}
+$('#jBack').onclick = () => history.back();
+$('#jMenu').onclick = () => { const j = jById(curJ); if (j) journalForm(j); };
+$('#fab').onclick = () => newEntry();
+$('#addJ').onclick = () => journalForm();
+$('#searchBtn').onclick = () => {
+  const bar = $('#searchBar');
+  bar.hidden = !bar.hidden;
+  if (!bar.hidden) $('#q').focus(); else { $('#q').value = ''; renderJournal(); }
+};
+$('#q').addEventListener('input', renderJournal);
+
+/* ---------- Редактор ---------- */
+function updateEmptyClass() { body.classList.toggle('empty', !body.innerText.trim() && !body.querySelector('img')); }
+const imgKey = s => s.length + ':' + s.slice(-48);
+function paintEditorHeader() {
+  $('#dateBtn').textContent = fmtFull(dateIn.value || cur.date);
+  const pb = $('#pinBtn'); pb.classList.toggle('on', !!cur.pinned); pb.setAttribute('aria-label', cur.pinned ? 'Відкріпити' : 'Закріпити');
+  const j = jById(cur.journalId);
+  const chip = $('#jChip'); chip.textContent = '';
+  chip.append(`${j ? j.icon : ''} ${j ? j.name : 'Журнал'}`, ico(ICON.chev.replace('<svg class="chev"', '<svg')));
+}
+function openEditor(e) {
+  cur = e;
+  titleIn.value = e.title || '';
+  dateIn.value = e.date;
+  body.innerHTML = e.html || '<p><br></p>';
+  const img = body.querySelector('img');
+  thumbKey = img ? imgKey(img.src) : null;
+  updateEmptyClass(); paintEditorHeader();
+  history.pushState({ v: 'editor' }, '');
+  show('editor');
+  $('#scroll').scrollTop = 0;
+  savedRange = null;
+  if (!e.title && !e.text && !img) setTimeout(() => titleIn.focus(), 60);
+}
+function newEntry() {
+  const jid = curJ !== 'all' ? curJ : (jById(lastJ) ? lastJ : journals[0].id);
+  openEditor({ id: uid(), journalId: jid, date: todayISO(), title: '', html: '', text: '', thumb: null, pinned: false, updated: Date.now() });
+}
+function makeThumb(src) {
+  return new Promise(res => {
+    const im = new Image();
+    im.onload = () => {
+      const c = document.createElement('canvas'); c.width = 160; c.height = 160;
+      const k = Math.max(160 / im.width, 160 / im.height);
+      c.getContext('2d').drawImage(im, (160 - im.width * k) / 2, (160 - im.height * k) / 2, im.width * k, im.height * k);
+      res(c.toDataURL('image/jpeg', 0.7));
+    };
+    im.onerror = () => res(null);
+    im.src = src;
+  });
+}
+async function save() {
+  if (!cur || cur.deleted) return;
+  clearTimeout(saveTimer);
+  const e = cur;
+  e.title = titleIn.value.trim();
+  e.date = dateIn.value || e.date;
+  e.html = body.innerHTML;
+  e.text = body.innerText.replace(/\s+/g, ' ').trim();
+  e.updated = Date.now();
+  const img = body.querySelector('img');
+  if (!img) { e.thumb = null; thumbKey = null; }
+  else if (imgKey(img.src) !== thumbKey) { thumbKey = imgKey(img.src); e.thumb = await makeThumb(img.src); }
+  if (!e.title && !e.text && !img) return;
+  if (!entries.includes(e)) entries.push(e);
+  await DB.put('entries', e);
+}
+const scheduleSave = () => { clearTimeout(saveTimer); saveTimer = setTimeout(save, 500); };
+async function closeEditor() {
+  if (!cur) return;
+  clearTimeout(saveTimer);
+  const e = cur;
+  if (e.deleted) {
+    entries = entries.filter(x => x !== e);
+    await DB.del('entries', e.id).catch(() => {});
+  } else {
+    await save();
+    if (!e.title && !e.text && !body.querySelector('img')) { entries = entries.filter(x => x !== e); await DB.del('entries', e.id).catch(() => {}); }
+  }
+  cur = null;
+  show('journal');
+  renderJournal();
+}
+$('#back').onclick = () => history.back();
+$('#del').onclick = () => {
+  if (!confirm('Видалити цей запис?')) return;
+  cur.deleted = true;
+  history.back();
+};
+$('#pinBtn').onclick = () => { cur.pinned = !cur.pinned; paintEditorHeader(); scheduleSave(); toast(cur.pinned ? 'Запис закріплено' : 'Запис відкріплено'); };
+$('#dateBtn').onclick = () => { try { dateIn.showPicker(); } catch (_) { dateIn.focus(); dateIn.click(); } };
+dateIn.addEventListener('change', () => { if (!dateIn.value) return; cur.date = dateIn.value; paintEditorHeader(); scheduleSave(); });
+$('#jChip').onclick = () => {
+  openSheet(h('div', { class: 'stitle' }, 'Перемістити в журнал'),
+    ...journals.map(j => h('button', { class: 'sbtn' + (j.id === cur.journalId ? ' sel' : ''), onclick: () => { cur.journalId = j.id; lastJ = j.id; hideSheet(); paintEditorHeader(); scheduleSave(); } }, jTile(j), j.name)));
+};
+
+/* ---------- Форматування ---------- */
+document.execCommand('defaultParagraphSeparator', false, 'p');
+const cmdBtns = [...document.querySelectorAll('#toolbar [data-cmd]')];
+document.querySelectorAll('#toolbar button').forEach(b => b.addEventListener('pointerdown', e => e.preventDefault()));
+cmdBtns.forEach(b => b.addEventListener('click', () => {
+  if (document.activeElement !== body) { body.focus(); restoreRange(); }
+  document.execCommand(b.dataset.cmd);
+  refreshState(); scheduleSave();
+}));
+function refreshState() { cmdBtns.forEach(b => { try { b.classList.toggle('on', document.queryCommandState(b.dataset.cmd)); } catch (_) {} }); }
+function restoreRange() { if (savedRange && body.contains(savedRange.startContainer)) { const s = getSelection(); s.removeAllRanges(); s.addRange(savedRange); return true; } return false; }
+document.addEventListener('selectionchange', () => {
+  const s = getSelection();
+  if (s.rangeCount && body.contains(s.anchorNode)) { savedRange = s.getRangeAt(0).cloneRange(); refreshState(); }
+  else cmdBtns.forEach(b => b.classList.remove('on'));
+});
+body.addEventListener('input', () => { updateEmptyClass(); scheduleSave(); });
+titleIn.addEventListener('input', scheduleSave);
+titleIn.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); body.focus(); } });
+
+/* ---------- Зображення ---------- */
+async function blobToDataURL(blob) {
+  const bmp = await createImageBitmap(blob, { imageOrientation: 'from-image' });
+  const max = 1600, s = Math.min(1, max / Math.max(bmp.width, bmp.height));
+  const c = document.createElement('canvas');
+  c.width = Math.round(bmp.width * s); c.height = Math.round(bmp.height * s);
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+  ctx.drawImage(bmp, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', 0.85);
+}
+async function insertImages(blobs) {
+  body.focus();
+  if (!restoreRange()) { const r = document.createRange(); r.selectNodeContents(body); r.collapse(false); const s = getSelection(); s.removeAllRanges(); s.addRange(r); }
+  for (const b of blobs) {
+    try {
+      const src = await blobToDataURL(b);
+      document.execCommand('insertHTML', false, `<img src="${src}" alt="">`);
+    } catch (_) { toast('Не вдалося додати зображення'); }
+  }
+  // гарантуємо місце для тексту після останнього зображення
+  const last = body.lastElementChild;
+  if (!last || last.querySelector('img') || last.tagName === 'IMG') body.insertAdjacentHTML('beforeend', '<p><br></p>');
+  updateEmptyClass(); scheduleSave();
+}
+async function replaceImage(img, blob) {
+  try { img.src = await blobToDataURL(blob); scheduleSave(); } catch (_) { toast('Не вдалося замінити зображення'); }
+}
+async function clipboardImage() {
+  if (!navigator.clipboard || !navigator.clipboard.read) throw new Error('unsupported');
+  const items = await navigator.clipboard.read();
+  for (const it of items) { const t = it.types.find(t => t.startsWith('image/')); if (t) return await it.getType(t); }
+  return null;
+}
+let targetImg = null;
+async function fromClipboard(then) {
+  try {
+    const b = await clipboardImage();
+    if (!b) { toast('У буфері обміну немає зображення'); return; }
+    hideSheet(); await then(b);
+  } catch (_) { toast('Немає доступу до буфера обміну або в ньому немає зображення'); }
+}
+function pickFile(img) { targetImg = img; $('#file').click(); }
+$('#file').addEventListener('change', async e => {
+  const files = [...e.target.files]; e.target.value = '';
+  hideSheet();
+  if (!files.length) return;
+  if (targetImg) { const t = targetImg; targetImg = null; await replaceImage(t, files[0]); }
+  else await insertImages(files);
+});
+$('#imgBtn').addEventListener('click', () => {
+  openSheet(h('div', { class: 'stitle' }, 'Додати зображення'),
+    sbtn(ICON.image, 'Вибрати з галереї', () => pickFile(null)),
+    sbtn(ICON.clip, 'Вставити з буфера обміну', () => fromClipboard(b => insertImages([b]))));
+});
+body.addEventListener('click', e => {
+  if (e.target.tagName !== 'IMG') return;
+  const img = e.target;
+  openSheet(h('div', { class: 'stitle' }, 'Зображення'),
+    sbtn(ICON.swap, 'Замінити з галереї', () => pickFile(img)),
+    sbtn(ICON.clip, 'Замінити з буфера обміну', () => fromClipboard(b => replaceImage(img, b))),
+    sbtn(ICON.trash, 'Видалити зображення', () => {
+      const p = img.parentElement; img.remove();
+      if (p && p !== body && !p.textContent.trim() && !p.querySelector('img')) p.remove();
+      if (!body.innerHTML.trim()) body.innerHTML = '<p><br></p>';
+      hideSheet(); updateEmptyClass(); scheduleSave();
+    }, 'danger'));
+});
+// Вставка (довге натискання → «Вставити» або буфер клавіатури)
+body.addEventListener('paste', e => {
+  const cd = e.clipboardData; if (!cd) return;
+  const imgs = [...(cd.files || [])].filter(f => f.type.startsWith('image/'));
+  e.preventDefault();
+  if (imgs.length) { insertImages(imgs); return; }
+  document.execCommand('insertText', false, cd.getData('text/plain'));
+});
+document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
+
+/* ---------- Меню та резервні копії ---------- */
+$('#menuBtn').onclick = () => {
+  openSheet(
+    sbtn(ICON.down, 'Зберегти резервну копію', () => {
+      const blob = new Blob([JSON.stringify({ app: 'journal', version: 2, journals, entries })], { type: 'application/json' });
+      const a = h('a', { href: URL.createObjectURL(blob), download: `shchodennyk-${todayISO()}.json` });
+      document.body.append(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      hideSheet(); toast('Копію збережено');
+    }),
+    sbtn(ICON.up, 'Відновити з копії', () => $('#importFile').click()),
+    h('div', { class: 'note' }, `Журналів: ${journals.length}, записів: ${entries.length}. Усі дані зберігаються лише на цьому пристрої — робіть резервну копію час від часу.`));
+};
+$('#importFile').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  try {
+    const data = JSON.parse(await f.text());
+    if (!Array.isArray(data.entries)) throw 0;
+    const jm = new Map(journals.map(x => [x.id, x]));
+    for (const j of (data.journals || [])) if (j.id && j.name && !jm.has(j.id)) { await DB.put('journals', j); jm.set(j.id, j); }
+    journals = [...jm.values()].sort((a, b) => a.order - b.order);
+    const fallback = journals[0].id;
+    const em = new Map(entries.map(x => [x.id, x]));
+    let n = 0;
+    for (const x of data.entries) {
+      if (!x.id || !x.date) continue;
+      if (!x.journalId || !jm.has(x.journalId)) x.journalId = fallback;
+      const old = em.get(x.id);
+      if (!old || (x.updated || 0) > (old.updated || 0)) { await DB.put('entries', x); em.set(x.id, x); n++; }
+    }
+    entries = [...em.values()];
+    hideSheet(); renderHome(); toast(`Відновлено записів: ${n}`);
+  } catch (_) { toast('Не вдалося прочитати файл'); }
+});
+
+/* ---------- Запуск ---------- */
+(async () => {
+  try {
+    await DB.open();
+    journals = (await DB.all('journals')).sort((a, b) => a.order - b.order);
+    entries = await DB.all('entries');
+    if (!journals.length) {
+      const j = { id: uid(), name: 'Щоденник', icon: '📓', color: COLORS[0], order: Date.now() };
+      await DB.put('journals', j); journals.push(j);
+    }
+    for (const e of entries) if (!e.journalId) { e.journalId = journals[0].id; await DB.put('entries', e); }
+  } catch (_) {
+    toast('Сховище недоступне');
+    if (!journals.length) journals.push({ id: 'tmp', name: 'Щоденник', icon: '📓', color: COLORS[0], order: 0 });
+  }
+  history.replaceState({ v: 'home' }, '');
+  showHome();
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+})();
+</script>
+</body>
+</html>
