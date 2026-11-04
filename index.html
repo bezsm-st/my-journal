@@ -132,7 +132,7 @@ svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke
 .pick.colors button.sel{border-color:var(--text)}
 .primary{width:100%;height:48px;border-radius:14px;background:var(--accent);color:#fff;font-weight:600;font-size:16px;margin-top:4px}
 .primary:disabled{opacity:.4}
-.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 96px);transform:translateX(-50%);background:var(--text);color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:20;opacity:0;transition:opacity .2s;pointer-events:none;max-width:86vw;text-align:center}
+.toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top) + 18px);transform:translateX(-50%);background:var(--text);color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;z-index:20;opacity:0;transition:opacity .2s;pointer-events:none;max-width:86vw;text-align:center}
 .toast.show{opacity:1}
 </style>
 </head>
@@ -737,6 +737,7 @@ $('#importFile').addEventListener('change', async e => {
 });
 
 /* ---------- Синхронізація Google Drive (прихована папка застосунку) ---------- */
+const WORKER_URL = ''; // за бажанням: адреса вашого Cloudflare Worker (інакше — у налаштуваннях синхронізації)
 const GOOGLE_CLIENT_ID = ''; // за бажанням вставте свій Client ID сюди, або введіть його в налаштуваннях синхронізації
 const ls = {
   get(k) { try { return localStorage.getItem(k); } catch (_) { return null; } },
@@ -746,7 +747,8 @@ const ls = {
 const SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
 const clientId = () => (GOOGLE_CLIENT_ID || ls.get('gdClientId') || '').trim();
 const connected = () => ls.get('gdConnected') === '1';
-const sync = { state: 'idle', error: '', last: +ls.get('gdLast') || 0, token: null, exp: 0, busy: false, timer: null, lastTry: 0 };
+const workerUrl = () => (WORKER_URL || ls.get('gdWorker') || '').trim().replace(/\/+$/, '');
+const sync = { state: 'idle', error: '', last: +ls.get('gdLast') || 0, token: null, exp: 0, busy: false, timer: null, lastTry: 0, note: '' };
 const tokenValid = () => sync.token && Date.now() < sync.exp - 60000;
 const fmtDT = ms => { const d = new Date(ms); const p = n => String(n).padStart(2, '0'); return `${d.getDate()} ${MONTHS_GEN[d.getMonth()]} ${d.getFullYear()}, ${p(d.getHours())}:${p(d.getMinutes())}`; };
 
@@ -769,27 +771,63 @@ function loadGIS() {
     document.head.append(s);
   });
 }
-function getToken(interactive) {
-  if (tokenValid()) return Promise.resolve(sync.token);
+const authErr = m => Object.assign(new Error(m), { auth: true });
+function setTok(j) { sync.token = j.access_token; sync.exp = Date.now() + (+j.expires_in || 3600) * 1000; }
+async function workerCall(path, payload) {
+  const r = await fetch(workerUrl() + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  let j = {}; try { j = await r.json(); } catch (_) {}
+  if (!r.ok) throw Object.assign(new Error(j.error_description || j.error || ('Помилка проксі (' + r.status + ')')), { code: j.error });
+  return j;
+}
+function authCode() {
   return loadGIS().then(() => new Promise((res, rej) => {
-    const authErr = m => Object.assign(new Error(m), { auth: true });
+    const t = setTimeout(() => rej(authErr('timeout')), 120000);
+    google.accounts.oauth2.initCodeClient({
+      client_id: clientId(), scope: SCOPE, ux_mode: 'popup',
+      callback: r => { clearTimeout(t); if (r.error) rej(authErr(r.error_description || r.error)); else res(r.code); },
+      error_callback: e => { clearTimeout(t); rej(authErr((e && e.type) || 'auth')); },
+    }).requestCode();
+  }));
+}
+async function getToken(interactive) {
+  if (tokenValid()) return sync.token;
+  if (workerUrl()) {
+    // безперервний режим: токен оновлюється через Worker без вікон
+    const rt = ls.get('gdRefresh');
+    if (rt) {
+      try { setTok(await workerCall('/refresh', { refresh_token: rt })); return sync.token; }
+      catch (e) { if (e.code !== 'invalid_grant') throw e; ls.del('gdRefresh'); }
+    }
+    if (!interactive) throw authErr('Потрібен вхід');
+    const j = await workerCall('/exchange', { code: await authCode() });
+    setTok(j);
+    if (j.refresh_token) { ls.set('gdRefresh', j.refresh_token); sync.note = ''; }
+    else sync.note = 'Google не видав довготривалий доступ, тому вхід знадобиться знову. Відкличте доступ застосунку на myaccount.google.com/permissions і підключіться ще раз.';
+    return sync.token;
+  }
+  // режим без Worker: токен на годину, вхід у спливному вікні
+  return loadGIS().then(() => new Promise((res, rej) => {
     const t = setTimeout(() => rej(authErr('timeout')), interactive ? 120000 : 15000);
     const client = google.accounts.oauth2.initTokenClient({
       client_id: clientId(), scope: SCOPE,
       callback: r => {
         clearTimeout(t);
         if (r.error) rej(authErr(r.error_description || r.error));
-        else { sync.token = r.access_token; sync.exp = Date.now() + (+r.expires_in || 3600) * 1000; res(sync.token); }
+        else { setTok(r); res(sync.token); }
       },
       error_callback: e => { clearTimeout(t); rej(authErr((e && e.type) || 'auth')); },
     });
     client.requestAccessToken({ prompt: '' });
   }));
 }
-async function gd(path, opts = {}, upload = false) {
+async function gd(path, opts = {}, upload = false, retried = false) {
   const base = upload ? 'https://www.googleapis.com/upload/drive/v3' : 'https://www.googleapis.com/drive/v3';
   const r = await fetch(base + path, { ...opts, headers: { ...(opts.headers || {}), Authorization: 'Bearer ' + sync.token } });
-  if (r.status === 401) { sync.token = null; sync.exp = 0; throw Object.assign(new Error('Потрібен повторний вхід'), { auth: true }); }
+  if (r.status === 401) {
+    sync.token = null; sync.exp = 0;
+    if (!retried && workerUrl() && ls.get('gdRefresh')) { await getToken(false); return gd(path, opts, upload, true); }
+    throw authErr('Потрібен повторний вхід');
+  }
   if (!r.ok) {
     let msg = ''; try { const j = await r.json(); msg = (j.error && j.error.message) || ''; } catch (_) {}
     throw new Error(msg || 'Помилка Google Drive (' + r.status + ')');
@@ -903,8 +941,8 @@ function handleSyncErr(e) {
   sync.busy = false;
   if (e && e.auth) setSyncState('auth', 'Потрібен вхід — натисніть «Синхронізувати зараз».');
   else {
-    const m = !navigator.onLine ? 'Немає інтернету' : ((e && e.message) || 'Помилка синхронізації');
-    setSyncState('error', m);
+    const net = !navigator.onLine || (e instanceof TypeError && /fetch|network|load failed/i.test(e.message));
+    setSyncState('error', net ? 'Немає з’єднання' : ((e && e.message) || 'Помилка синхронізації'));
   }
 }
 async function runSync(interactive) {
@@ -914,40 +952,50 @@ async function runSync(interactive) {
 function touchSync() {
   if (!connected() || !clientId()) return;
   clearTimeout(sync.timer);
-  sync.timer = setTimeout(() => { if (tokenValid() && !sync.busy) syncNow(false).catch(handleSyncErr); }, 4000);
+  sync.timer = setTimeout(() => { if ((tokenValid() || (workerUrl() && ls.get('gdRefresh'))) && !sync.busy) syncNow(false).catch(handleSyncErr); }, 4000);
 }
-function openSyncSheet() {
-  const cid = clientId(), con = connected();
+function openSyncSheet(editCfg) {
+  const cid = clientId(), wk = workerUrl(), con = connected();
   const nodes = [h('div', { class: 'stitle' }, 'Синхронізація Google Drive')];
-  if (!cid) {
-    const inp = h('input', { class: 'field', placeholder: 'Client ID  (…apps.googleusercontent.com)', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false' });
+  const input = (ph, val, locked) => {
+    const i = h('input', { class: 'field', placeholder: ph, autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false' });
+    i.value = val || ''; if (locked) i.disabled = true; return i;
+  };
+  if (!cid || editCfg) {
+    const a = input('Client ID  (…apps.googleusercontent.com)', cid, !!GOOGLE_CLIENT_ID);
+    const b = input('Адреса Worker  (https://….workers.dev)', wk, !!WORKER_URL);
     nodes.push(
-      h('div', { class: 'note' }, 'Дані лежать у прихованій папці застосунку у вашому Google Drive — інші програми й ви самі в Drive її не бачите. Для підключення потрібен власний OAuth Client ID із Google Cloud Console.'),
-      inp,
+      h('div', { class: 'note' }, 'Дані лежать у прихованій папці застосунку у вашому Google Drive. Client ID — з Google Cloud Console. Адреса Worker потрібна, щоб не входити в Google після кожного запуску; без неї вхід знадобиться щоразу.'),
+      a, b,
       h('button', { class: 'primary', onclick: () => {
-        const v = inp.value.trim();
-        if (!/\.apps\.googleusercontent\.com$/.test(v)) { toast('Схоже, це не Client ID'); return; }
-        ls.set('gdClientId', v); openSyncSheet();
-      } }, 'Зберегти Client ID'));
+        const v = a.value.trim(), w = b.value.trim().replace(/\/+$/, '');
+        if (!GOOGLE_CLIENT_ID && !/\.apps\.googleusercontent\.com$/.test(v)) { toast('Схоже, це не Client ID'); return; }
+        if (w && !/^https:\/\/\S+$/.test(w)) { toast('Адреса Worker має починатися з https://'); return; }
+        if (v !== cid || w !== wk) { ls.del('gdRefresh'); ls.del('gdConnected'); sync.token = null; sync.exp = 0; }
+        if (!GOOGLE_CLIENT_ID) ls.set('gdClientId', v);
+        if (!WORKER_URL) { if (w) ls.set('gdWorker', w); else ls.del('gdWorker'); }
+        paintSyncBtn(); openSyncSheet();
+      } }, 'Зберегти'));
   } else if (!con) {
     nodes.push(
-      h('div', { class: 'note' }, 'Client ID збережено. Увійдіть у Google і дозвольте доступ до прихованої папки застосунку.'),
+      h('div', { class: 'note' }, 'Налаштування збережено. Увійдіть у Google і дозвольте доступ до прихованої папки застосунку.'),
       h('button', { class: 'primary', onclick: () => runSync(true) }, 'Підключити Google Drive'));
     if (sync.error) nodes.push(h('div', { class: 'note', style: 'color:var(--danger)' }, sync.error));
+    nodes.push(h('button', { class: 'sbtn', style: 'justify-content:center', onclick: () => openSyncSheet(true) }, 'Змінити налаштування'));
   } else {
     const status = sync.state === 'syncing' ? 'Синхронізація…'
       : sync.state === 'error' || sync.state === 'auth' ? sync.error
       : sync.last ? 'Остання синхронізація: ' + fmtDT(sync.last) : 'Ще не синхронізовано';
     nodes.push(
       h('div', { class: 'note', style: sync.state === 'error' ? 'color:var(--danger)' : '' }, status),
+      h('div', { class: 'note', style: 'padding-top:0' }, wk ? 'Вхід: безперервний (через Worker)' : 'Вхід: щогодини, без Worker'));
+    if (sync.note) nodes.push(h('div', { class: 'note', style: 'color:var(--danger)' }, sync.note));
+    nodes.push(
       h('button', { class: 'primary', onclick: () => runSync(true) }, 'Синхронізувати зараз'),
       h('button', { class: 'sbtn', style: 'justify-content:center;margin-top:6px', onclick: () => {
-        try { if (sync.token && window.google) google.accounts.oauth2.revoke(sync.token); } catch (_) {}
-        sync.token = null; sync.exp = 0; ls.del('gdConnected'); setSyncState('idle');
-      } }, 'Відключити'));
-  }
-  if (cid && !GOOGLE_CLIENT_ID) {
-    nodes.push(h('button', { class: 'sbtn', style: 'justify-content:center', onclick: () => { ls.del('gdClientId'); ls.del('gdConnected'); sync.token = null; setSyncState('idle'); } }, 'Змінити Client ID'));
+        sync.token = null; sync.exp = 0; sync.note = ''; ls.del('gdConnected'); ls.del('gdRefresh'); setSyncState('idle');
+      } }, 'Відключити'),
+      h('button', { class: 'sbtn', style: 'justify-content:center', onclick: () => openSyncSheet(true) }, 'Змінити налаштування'));
   }
   openSheet(...nodes);
   sheetKind = 'sync';
