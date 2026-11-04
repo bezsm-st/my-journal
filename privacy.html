@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Privacy Policy — Щоденник (my-journal)</title>
+<style>
+  :root{--bg:#fff;--text:#232323;--muted:#76766f;--border:#ececea;--accent:#3f6c9e}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:16px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  main{max-width:680px;margin:0 auto;padding:40px 20px 80px}
+  h1,h2{font-family:ui-serif,Georgia,"Times New Roman",serif;font-weight:500;letter-spacing:-.01em}
+  h1{font-size:30px;margin:0 0 4px}
+  h2{font-size:21px;margin:30px 0 8px}
+  p,li{margin:.5em 0}
+  .muted{color:var(--muted);font-size:14px}
+  hr{border:0;border-top:1px solid var(--border);margin:44px 0}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+<main>
+
+<h1>Privacy Policy</h1>
+<p class="muted">Щоденник (my-journal) · Last updated: 4 November 2026 · <a href="#uk">Українська версія нижче</a></p>
+
+<p>Щоденник is a personal journal web app (PWA) used by its owner. It is designed so that your entries stay under your control. The developer does not collect, store or have access to your journal data.</p>
+
+<h2>What data the app handles</h2>
+<p>Journals, entries, text formatting and images that you create in the app. This data is stored locally in your browser (IndexedDB) on your own device.</p>
+
+<h2>Optional Google Drive sync</h2>
+<p>If you turn on sync, the app asks for the Google Drive scope <code>https://www.googleapis.com/auth/drive.appdata</code>. It gives access only to a hidden application-data folder in your own Google Drive that is created for this app. The app cannot see, read or change any of your other Drive files. Your journal data is sent directly between your device and your Google Drive.</p>
+
+<h2>Sign-in helper</h2>
+<p>To keep you signed in without asking every time, the app uses a small helper service (a Cloudflare Worker) run by the app owner. It only forwards Google sign-in codes and refresh tokens to Google in order to obtain access tokens. It does not access, read or store your journal content. The long-lived refresh token is kept only in your browser's local storage.</p>
+
+<h2>What we do not do</h2>
+<ul>
+  <li>No analytics, advertising or tracking.</li>
+  <li>No sale, sharing or transfer of your data to third parties.</li>
+  <li>No use of your data for anything other than syncing your own journal between your own devices.</li>
+</ul>
+<p>The app's use and transfer of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
+
+<h2>Your control</h2>
+<ul>
+  <li>Use “Disconnect” in the app's sync settings to stop syncing.</li>
+  <li>Revoke access at <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.</li>
+  <li>Delete the synced data in Google Drive: Settings → Manage apps → this app → Delete hidden app data.</li>
+  <li>Delete local data by clearing the site's data in your browser.</li>
+</ul>
+
+<h2>Contact</h2>
+<p>Use the support email shown on the app's Google sign-in consent screen.</p>
+
+<hr id="uk">
+
+<h1 lang="uk">Політика конфіденційності</h1>
+<p class="muted" lang="uk">Щоденник (my-journal) · Останнє оновлення: 4 листопада 2026</p>
+
+<div lang="uk">
+<p>«Щоденник» — особистий веб-застосунок (PWA) для ведення журналів. Ваші записи залишаються під вашим контролем: розробник не збирає, не зберігає і не має доступу до ваших даних.</p>
+
+<h2>Які дані обробляє застосунок</h2>
+<p>Журнали, записи, форматування тексту й зображення, які ви створюєте. Вони зберігаються локально у вашому браузері (IndexedDB) на вашому пристрої.</p>
+
+<h2>Необов'язкова синхронізація з Google Drive</h2>
+<p>Якщо ви вмикаєте синхронізацію, застосунок запитує доступ <code>drive.appdata</code>. Він дає доступ лише до прихованої службової папки цього застосунку у вашому Google Drive й не дозволяє бачити чи змінювати інші ваші файли. Дані передаються безпосередньо між вашим пристроєм і вашим Google Drive.</p>
+
+<h2>Допоміжний сервіс входу</h2>
+<p>Щоб не просити вхід щоразу, застосунок користується невеликим допоміжним сервісом (Cloudflare Worker), яким керує власник застосунку. Він лише передає коди входу й токени оновлення до Google для отримання токенів доступу та не має доступу до вмісту ваших записів і не зберігає його. Довготривалий токен зберігається лише в локальному сховищі вашого браузера.</p>
+
+<h2>Чого ми не робимо</h2>
+<ul>
+  <li>Не використовуємо аналітику, рекламу чи відстеження.</li>
+  <li>Не продаємо й не передаємо ваші дані третім особам.</li>
+  <li>Не використовуємо дані ні для чого, крім синхронізації вашого журналу між вашими пристроями.</li>
+</ul>
+
+<h2>Ваш контроль</h2>
+<ul>
+  <li>Кнопка «Відключити» в налаштуваннях синхронізації зупиняє синхронізацію.</li>
+  <li>Доступ можна відкликати на <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.</li>
+  <li>Синхронізовані дані можна видалити в Google Drive: Налаштування → Керування застосунками → цей застосунок → Видалити приховані дані.</li>
+  <li>Локальні дані видаляються очищенням даних сайту в браузері.</li>
+</ul>
+
+<h2>Контакти</h2>
+<p>Скористайтеся адресою підтримки, вказаною на екрані згоди Google під час входу.</p>
+</div>
+
+</main>
+</body>
+</html>
