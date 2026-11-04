@@ -1,4 +1,4 @@
-const CACHE = 'journal-v3';
+const CACHE = 'journal-v4';
 const ASSETS = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png'];
 
 self.addEventListener('install', e => {
@@ -16,6 +16,8 @@ self.addEventListener('activate', e => {
 // Network first (so updates arrive), cache as offline fallback
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  // Запити до Google (вхід, Drive API) не кешуємо й не перехоплюємо
+  if (new URL(e.request.url).origin !== self.location.origin) return;
   e.respondWith(
     fetch(e.request)
       .then(res => {
